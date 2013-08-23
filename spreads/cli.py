@@ -40,15 +40,10 @@ from spreads.plugin import get_devices, get_pluginmanager
 from spreads.util import DeviceException, ColourStreamHandler
 
 # Kudos to http://stackoverflow.com/a/1394994/487903
-try:
+if sys.platform == 'win32':
     from msvcrt import getch
-except ImportError:
-    def getch():
-        """ Wait for keypress on stdin.
-
-        :returns: unicode -- Value of character that was pressed
-
-        """
+else:
+    def _getch_stdin():
         import tty
         import termios
         fd = sys.stdin.fileno()
@@ -58,7 +53,51 @@ except ImportError:
             return sys.stdin.read(1)
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
+    try:
+        def _getch_hid():
+            """ Polls all attached HID devices for events and returns "b"
+            if a full keypress is realized.
+            """
+            # Time in seconds after which to send cancel key if the trigger
+            # is not released
+            TIMEOUT = 5
+            # TODO: Verify that the HID device is a keyboard (via libusb?)
+            # TODO: Verify that the pressed key is indeed one of the configured
+            #       keys (via USB scancode->key map)
+            while True:
+                for dev in _hid_devs:
+                    # See if there's input
+                    if dev.read(8):
+                        # Wait for key release
+                        count = 0
+                        while not dev.read(8):
+                            if count > TIMEOUT*100:
+                                return "c"
+                            time.sleep(0.01)
+                            count += 1
+                            continue
+                        return "b"
+                    else:
+                        time.sleep(0.01)
+        import hid
+        _hid_devs = []
+        for candidate in {(x['vendor_id'], x['product_id'])
+                          for x in hid.enumerate(0, 0)}:
+            try:
+                dev = hid.device(*candidate)
+            except IOError:
+                raise DeviceException("Could not open HID device, please check"
+                                      " your permissions on /dev/bus/usb.")
+            dev.set_nonblocking(True)
+            _hid_devs.append(dev)
+        # Fall back to stdin if there are no HID devices
+        if _hid_devs:
+            getch = _getch_hid
+        else:
+            print("No HID devices available, falling back to stdin.")
+            getch = _getch_stdin
+    except ImportError, DeviceException:
+        getch = _getch_stdin
 
 def configure(args=None):
     for orientation in ('left', 'right'):
