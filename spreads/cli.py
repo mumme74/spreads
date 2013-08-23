@@ -96,7 +96,7 @@ else:
         else:
             print("No HID devices available, falling back to stdin.")
             getch = _getch_stdin
-    except ImportError, DeviceException:
+    except (ImportError, DeviceException):
         getch = _getch_stdin
 
 def configure(args=None):
