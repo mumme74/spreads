@@ -63,3 +63,10 @@ djvubind:
     ocr: none
     tesseract_options: [] # not yet implemented
     cuneiform_options: [] # not yet implemented
+
+magickcrop:
+    # Distance from page border to gutter in pixels
+    gutter_odd: 0
+    gutter_even: 0
+    # Extra area to crop from top, bottom and outer edge in pixels
+    extra_crop: 0
